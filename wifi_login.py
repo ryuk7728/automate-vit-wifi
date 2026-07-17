@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -31,14 +32,50 @@ APP_NAME = "Automate VIT WiFi"
 CREDENTIAL_TARGET = "AutomateVitWifi:portal-password"
 DEFAULT_PROBE_URL = "http://neverssl.com/"
 CONNECTIVITY_CHECKS = (
-    ("https://www.msftconnecttest.com/connecttest.txt", 200, b"Microsoft Connect Test"),
     ("https://www.google.com/generate_204", 204, b""),
+    ("https://www.msftconnecttest.com/connecttest.txt", 200, b"Microsoft Connect Test"),
     ("https://cloudflare.com/cdn-cgi/trace", 200, b"fl="),
 )
 BACKGROUND_MUTEX_NAME = r"Local\AutomateVitWifiBackground"
-POLL_SECONDS = 20
-RETRY_SECONDS = 5 * 60
+# Windows raises a WLAN notification as soon as it finishes connecting.  These
+# timers are only fallbacks for missed notifications and portal retry recovery.
+BACKGROUND_FALLBACK_SECONDS = 60
+STATUS_POLL_SECONDS = 20
+RETRY_INITIAL_SECONDS = 15
+RETRY_MAX_SECONDS = 60
+NETWORK_READY_TIMEOUT_SECONDS = 5
+NETWORK_READY_INTERVAL_SECONDS = 0.25
+POST_LOGIN_SETTLE_SECONDS = 1
 SETTINGS_PATH = Path(os.environ.get("APPDATA", Path.home())) / APP_NAME / "settings.json"
+
+WLAN_NOTIFICATION_SOURCE_ACM = 0x00000008
+WLAN_NOTIFICATION_ACM_CONNECTION_COMPLETE = 10
+WLAN_NOTIFICATION_ACM_INTERFACE_ARRIVAL = 13
+WLAN_NOTIFICATION_ACM_DISCONNECTED = 21
+
+
+class GUID(ctypes.Structure):
+    _fields_ = [
+        ("Data1", wintypes.DWORD),
+        ("Data2", wintypes.WORD),
+        ("Data3", wintypes.WORD),
+        ("Data4", ctypes.c_ubyte * 8),
+    ]
+
+
+class WLAN_NOTIFICATION_DATA(ctypes.Structure):
+    _fields_ = [
+        ("NotificationSource", wintypes.DWORD),
+        ("NotificationCode", wintypes.DWORD),
+        ("InterfaceGuid", GUID),
+        ("dwDataSize", wintypes.DWORD),
+        ("pData", ctypes.c_void_p),
+    ]
+
+
+WLAN_NOTIFICATION_CALLBACK = ctypes.WINFUNCTYPE(
+    None, ctypes.POINTER(WLAN_NOTIFICATION_DATA), ctypes.c_void_p
+)
 
 
 class CREDENTIAL(ctypes.Structure):
@@ -160,11 +197,123 @@ def connected_ssid() -> str | None:
     return None
 
 
+def has_routable_ipv4() -> bool:
+    """Return whether Windows has assigned a usable IPv4 route yet.
+
+    A UDP connect does not send data. It simply asks Windows which local
+    address it would use, making it a quick way to avoid starting a portal
+    request before DHCP has finished after a Wi-Fi connection event.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("1.1.1.1", 53))
+            address = probe.getsockname()[0]
+        return bool(address) and not address.startswith("169.254.") and address != "0.0.0.0"
+    except OSError:
+        return False
+
+
+def wait_for_network_ready(expected_ssid: str, stop_event: threading.Event) -> bool:
+    """Wait briefly for the just-connected Wi-Fi adapter to finish DHCP."""
+    deadline = time.monotonic() + NETWORK_READY_TIMEOUT_SECONDS
+    while not stop_event.is_set() and time.monotonic() < deadline:
+        current_ssid = connected_ssid()
+        if current_ssid != expected_ssid:
+            return False
+        if has_routable_ipv4():
+            return True
+        stop_event.wait(NETWORK_READY_INTERVAL_SECONDS)
+    return connected_ssid() == expected_ssid and has_routable_ipv4()
+
+
+class WifiConnectionNotifier:
+    """Wake a monitor immediately when Windows connects or disconnects Wi-Fi.
+
+    The Windows WLAN API is used only as a signal.  SSID and portal decisions
+    remain in the monitor, so a missing WLAN API or a missed notification
+    harmlessly falls back to periodic checks.
+    """
+
+    def __init__(self, wake_event: threading.Event, connection_event: threading.Event) -> None:
+        self.wake_event = wake_event
+        self.connection_event = connection_event
+        self.stop_event = threading.Event()
+        self.thread: threading.Thread | None = None
+        self.callback = WLAN_NOTIFICATION_CALLBACK(self._on_notification)
+
+    def start(self) -> None:
+        try:
+            ctypes.WinDLL("wlanapi", use_last_error=True)
+        except OSError:
+            return
+        self.thread = threading.Thread(target=self._listen, daemon=True, name="wlan-events")
+        self.thread.start()
+
+    def stop(self) -> None:
+        self.stop_event.set()
+        if self.thread is not None:
+            self.thread.join(timeout=1)
+
+    def _on_notification(self, notification_ptr, _context) -> None:
+        try:
+            notification = notification_ptr.contents
+            if not notification.NotificationSource & WLAN_NOTIFICATION_SOURCE_ACM:
+                return
+            if notification.NotificationCode in {
+                WLAN_NOTIFICATION_ACM_CONNECTION_COMPLETE,
+                WLAN_NOTIFICATION_ACM_INTERFACE_ARRIVAL,
+            }:
+                self.connection_event.set()
+                self.wake_event.set()
+            elif notification.NotificationCode == WLAN_NOTIFICATION_ACM_DISCONNECTED:
+                self.wake_event.set()
+        except (ValueError, OSError):
+            # A callback can race with shutdown; the timer fallback still runs.
+            pass
+
+    def _listen(self) -> None:
+        wlanapi = ctypes.WinDLL("wlanapi", use_last_error=True)
+        wlanapi.WlanOpenHandle.argtypes = (
+            wintypes.DWORD, ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD),
+            ctypes.POINTER(wintypes.HANDLE),
+        )
+        wlanapi.WlanOpenHandle.restype = wintypes.DWORD
+        wlanapi.WlanRegisterNotification.argtypes = (
+            wintypes.HANDLE, wintypes.DWORD, wintypes.BOOL,
+            WLAN_NOTIFICATION_CALLBACK, ctypes.c_void_p, ctypes.c_void_p,
+            ctypes.POINTER(wintypes.DWORD),
+        )
+        wlanapi.WlanRegisterNotification.restype = wintypes.DWORD
+        wlanapi.WlanCloseHandle.argtypes = (wintypes.HANDLE, ctypes.c_void_p)
+        wlanapi.WlanCloseHandle.restype = wintypes.DWORD
+
+        negotiated_version = wintypes.DWORD()
+        client_handle = wintypes.HANDLE()
+        if wlanapi.WlanOpenHandle(2, None, ctypes.byref(negotiated_version), ctypes.byref(client_handle)) != 0:
+            return
+        try:
+            previous_source = wintypes.DWORD()
+            result = wlanapi.WlanRegisterNotification(
+                client_handle,
+                WLAN_NOTIFICATION_SOURCE_ACM,
+                True,
+                self.callback,
+                None,
+                None,
+                ctypes.byref(previous_source),
+            )
+            if result != 0:
+                return
+            self.stop_event.wait()
+        finally:
+            wlanapi.WlanCloseHandle(client_handle, None)
+
+
 def internet_is_working() -> bool:
     """Confirm genuine internet access through any one of three HTTPS checks."""
     for url, expected_status, expected_text in CONNECTIVITY_CHECKS:
         try:
-            request = Request(url, headers={"User-Agent": "AutomateVitWifi/1.3"})
+            request = Request(url, headers={"User-Agent": "AutomateVitWifi/1.4"})
             with urlopen(request, timeout=3) as response:
                 body = response.read(256)
                 if response.status == expected_status and expected_text in body:
@@ -202,7 +351,7 @@ class LoginFormParser(HTMLParser):
 
 def get_portal_page(opener, probe_url: str) -> tuple[str, str]:
     """Fetch a login page, including Pronto's JavaScript-only redirect step."""
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AutomateVitWifi/1.3"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AutomateVitWifi/1.4"}
     response = opener.open(Request(probe_url, headers=headers), timeout=12)
     page = response.read().decode(response.headers.get_content_charset() or "utf-8", "replace")
     source_url = response.geturl()
@@ -246,7 +395,7 @@ def portal_login(username: str, password: str, probe_url: str = DEFAULT_PROBE_UR
     try:
         response = opener.open(Request(target, data=body, method="POST", headers={
             "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AutomateVitWifi/1.3",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AutomateVitWifi/1.4",
         }), timeout=15)
         response.read()
     except (HTTPError, URLError, TimeoutError, OSError) as error:
@@ -255,53 +404,150 @@ def portal_login(username: str, password: str, probe_url: str = DEFAULT_PROBE_UR
 
 
 class Monitor:
-    """Reports VIT connection state and optionally attempts portal authentication."""
+    """Reports VIT state and authenticates immediately after WLAN events."""
 
     def __init__(self, report, automate: bool) -> None:
         self.report = report
         self.automate = automate
         self.stop_event = threading.Event()
+        self.wake_event = threading.Event()
+        self.connection_event = threading.Event()
         self.last_ssid: str | None = None
-        self.last_attempt = 0.0
+        self.next_retry_at = 0.0
+        self.retry_delay = RETRY_INITIAL_SECONDS
+        self.pending_connection_checks = 0
 
     def start(self) -> None:
         threading.Thread(target=self._run, daemon=True, name="wifi-monitor").start()
 
     def _run(self) -> None:
-        while not self.stop_event.is_set():
-            settings = load_settings()
-            if not settings["enabled"]:
-                self.report("red", "Automation is disabled.")
-            else:
-                ssid = connected_ssid()
-                if not ssid or not ssid.upper().endswith("-VIT"):
-                    self.last_ssid = None
-                    self.report("red", "Not connected to VIT Wi-Fi.")
-                elif internet_is_working():
-                    self.report("green", f"{ssid} is connected and internet is working.")
-                else:
-                    self._handle_offline_vit(ssid, settings)
-            self.stop_event.wait(POLL_SECONDS)
+        notifier = WifiConnectionNotifier(self.wake_event, self.connection_event)
+        notifier.start()
+        # Covers app startup and Windows resume even if there is no new event.
+        self.connection_event.set()
+        self.wake_event.set()
+        try:
+            while not self.stop_event.is_set():
+                if self.wake_event.is_set():
+                    self.wake_event.clear()
+                connection_event = self.connection_event.is_set()
+                if connection_event:
+                    self.connection_event.clear()
+                self._check_connection(connection_event)
+                self._wait_for_next_check()
+        finally:
+            notifier.stop()
 
-    def _handle_offline_vit(self, ssid: str, settings: dict) -> None:
-        should_attempt = self.automate and (
-            ssid != self.last_ssid or time.monotonic() - self.last_attempt >= RETRY_SECONDS
-        )
-        if not should_attempt:
-            self.report("red", f"{ssid} is connected, but internet is unavailable.")
+    def _wait_for_next_check(self) -> None:
+        timeout = STATUS_POLL_SECONDS if not self.automate else BACKGROUND_FALLBACK_SECONDS
+        if self.pending_connection_checks:
+            timeout = min(timeout, NETWORK_READY_INTERVAL_SECONDS)
+        if self.automate and self.next_retry_at:
+            timeout = min(timeout, max(0, self.next_retry_at - time.monotonic()))
+        deadline = time.monotonic() + timeout
+        while not self.stop_event.is_set() and not self.wake_event.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            self.wake_event.wait(min(0.5, remaining))
+
+    def _check_connection(self, connection_event: bool) -> None:
+        if connection_event:
+            self.pending_connection_checks = int(
+                NETWORK_READY_TIMEOUT_SECONDS / NETWORK_READY_INTERVAL_SECONDS
+            )
+        settings = load_settings()
+        if not settings["enabled"]:
+            self._reset_connection_state()
+            self.report("red", "Automation is disabled.")
             return
+
+        ssid = connected_ssid()
+        if not ssid or not ssid.upper().endswith("-VIT"):
+            if self.pending_connection_checks:
+                self.pending_connection_checks -= 1
+                self.report("red", "Checking the Wi-Fi connection...")
+                return
+            self._reset_connection_state()
+            self.report("red", "Not connected to VIT Wi-Fi.")
+            return
+
+        is_new_vit_connection = (
+            connection_event or self.pending_connection_checks > 0 or ssid != self.last_ssid
+        )
+        self.pending_connection_checks = 0
         self.last_ssid = ssid
-        self.last_attempt = time.monotonic()
+        if is_new_vit_connection:
+            self.retry_delay = RETRY_INITIAL_SECONDS
+            self.next_retry_at = 0.0
+            if not wait_for_network_ready(ssid, self.stop_event):
+                if not self.stop_event.is_set():
+                    self.report("red", f"{ssid} is connected; waiting for the network address...")
+                    self._schedule_retry()
+                return
+            if self.automate:
+                # Go straight to the normal HTTP portal flow.  This is faster
+                # than waiting for several HTTPS checks to time out, and it
+                # cannot submit credentials unless the real portal form exists.
+                self._attempt_portal_login(ssid, settings)
+            else:
+                self._report_connectivity(ssid)
+            return
+
+        if internet_is_working():
+            self._mark_online(ssid)
+            return
+
+        if self.automate and (
+            not self.next_retry_at or time.monotonic() >= self.next_retry_at
+        ):
+            self._attempt_portal_login(ssid, settings)
+        else:
+            self.report("red", f"{ssid} is connected, but internet is unavailable.")
+
+    def _attempt_portal_login(self, ssid: str, settings: dict) -> None:
         self.report("red", f"{ssid} is connected; signing in...")
         try:
             answer = portal_login(settings["username"], load_password() or "")
-            self.stop_event.wait(2)
+            if answer == "No captive login form found.":
+                # The direct HTTP probe is normal when a valid session already
+                # exists.  Check HTTPS before deciding it needs attention.
+                if internet_is_working():
+                    self._mark_online(ssid)
+                else:
+                    self.report("red", f"{ssid} is connected, but internet is unavailable.")
+                    self._schedule_retry()
+                return
+            self.stop_event.wait(POST_LOGIN_SETTLE_SECONDS)
             if internet_is_working():
-                self.report("green", f"{ssid} is connected and internet is working.")
+                self._mark_online(ssid)
             else:
                 self.report("red", f"{ssid}: {answer}")
+                self._schedule_retry()
         except (RuntimeError, ValueError) as error:
             self.report("red", f"{ssid}: {error}")
+            self._schedule_retry()
+
+    def _report_connectivity(self, ssid: str) -> None:
+        if internet_is_working():
+            self._mark_online(ssid)
+        else:
+            self.report("red", f"{ssid} is connected, but internet is unavailable.")
+
+    def _mark_online(self, ssid: str) -> None:
+        self.next_retry_at = 0.0
+        self.retry_delay = RETRY_INITIAL_SECONDS
+        self.report("green", f"{ssid} is connected and internet is working.")
+
+    def _schedule_retry(self) -> None:
+        self.next_retry_at = time.monotonic() + self.retry_delay
+        self.retry_delay = min(self.retry_delay * 2, RETRY_MAX_SECONDS)
+
+    def _reset_connection_state(self) -> None:
+        self.last_ssid = None
+        self.next_retry_at = 0.0
+        self.retry_delay = RETRY_INITIAL_SECONDS
+        self.pending_connection_checks = 0
 
 
 class SettingsWindow:

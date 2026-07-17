@@ -38,12 +38,17 @@ network normally; this app only completes the web login after connection.
 
 The application is a Windows Python/Tkinter app packaged with PyInstaller. It:
 
-- watches the current SSID and acts only on names ending in `-VIT`;
+- listens to Windows Wi-Fi connection events, then falls back to periodic
+  checks if an event is missed;
+- acts only on names ending in `-VIT`, waits briefly for DHCP to finish, and
+  starts the portal flow without an initial polling delay;
 - follows the Pronto captive portal's HTTP and JavaScript redirect flow;
 - submits the portal's normal `userId`, `password`, and
   `serviceName=ProntoAuthentication` form fields;
 - uses Windows Credential Manager for the password;
-- verifies connectivity with Microsoft, Google, and Cloudflare HTTPS probes;
+- verifies connectivity with Google, Microsoft, or Cloudflare HTTPS probes;
+- retries a failed portal request after 15, 30, then 60 seconds while it stays
+  on the same VIT network;
 - runs one per-user background process, started through the Windows sign-in
   registry entry while automation is enabled.
 
