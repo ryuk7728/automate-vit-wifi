@@ -1,6 +1,6 @@
 ; Build with Inno Setup 6: iscc AutomateVitWifi.iss
 #define AppName "Automate VIT WiFi"
-#define AppVersion "1.2.0"
+#define AppVersion "1.3.0"
 #define AppPublisher "Automate VIT WiFi"
 #define AppExeName "AutomateVitWifi.exe"
 
