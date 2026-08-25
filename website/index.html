@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A small Windows utility that automatically completes the VIT captive-portal login after Windows connects to VIT Wi-Fi."
+    />
+    <meta name="theme-color" content="#0b5bd3" />
+    <title>Automate VIT WiFi — captive portal login, handled</title>
+    <style>
+      :root {
+        --ink: #101b33;
+        --muted: #596781;
+        --soft: #eaf0f9;
+        --line: #dce5f2;
+        --paper: #ffffff;
+        --canvas: #f7f9fd;
+        --blue: #0b5bd3;
+        --blue-dark: #0646a8;
+        --blue-soft: #e8f1ff;
+        --green: #17935d;
+        --green-soft: #e8f8f0;
+        --amber: #c2760b;
+        --radius: 22px;
+        --shadow: 0 18px 48px rgba(27, 57, 102, 0.11);
+        --max: 1160px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html { scroll-behavior: smooth; }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        overflow-x: hidden;
+        color: var(--ink);
+        background: var(--canvas);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      a { color: inherit; }
+
+      a:focus-visible,
+      button:focus-visible,
+      summary:focus-visible {
+        outline: 3px solid #79b8ff;
+        outline-offset: 4px;
+      }
+
+      .wrap { width: min(calc(100% - 40px), var(--max)); margin: 0 auto; }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 16px;
+        color: var(--blue-dark);
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        width: 22px;
+        height: 2px;
+        background: currentColor;
+        content: "";
+      }
+
+      h1, h2, h3, p { margin-top: 0; }
+
+      h1, h2, h3 { letter-spacing: -0.04em; line-height: 1.08; }
+
+      h1 { max-width: 680px; margin-bottom: 20px; font-size: clamp(2.65rem, 6vw, 5.2rem); }
+      h2 { margin-bottom: 16px; font-size: clamp(2rem, 4vw, 3.35rem); }
+      h3 { margin-bottom: 10px; font-size: 1.14rem; }
+
+      .lede { max-width: 620px; color: var(--muted); font-size: clamp(1.05rem, 1.8vw, 1.22rem); }
+
+      .site-header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid rgba(220, 229, 242, 0.75);
+        background: rgba(247, 249, 253, 0.88);
+        backdrop-filter: blur(14px);
+      }
+
+      .nav {
+        display: flex;
+        min-height: 74px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 800; text-decoration: none; letter-spacing: -0.02em; }
+      .brand-mark { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 9px; color: white; background: var(--blue); box-shadow: 0 6px 14px rgba(11, 91, 211, 0.25); }
+      .brand-mark svg { width: 19px; height: 19px; }
+
+      .nav-links { display: flex; align-items: center; gap: 23px; font-size: 0.9rem; font-weight: 700; }
+      .nav-links > a:not(.button) { color: #43516b; text-decoration: none; }
+      .nav-links > a:not(.button):hover { color: var(--blue); }
+
+      .button {
+        display: inline-flex;
+        min-height: 48px;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        padding: 0 19px;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        color: white;
+        background: var(--blue);
+        box-shadow: 0 9px 18px rgba(11, 91, 211, 0.18);
+        font-size: 0.94rem;
+        font-weight: 800;
+        text-decoration: none;
+        transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+      }
+
+      .button:hover { background: var(--blue-dark); box-shadow: 0 12px 25px rgba(11, 91, 211, 0.28); transform: translateY(-2px); }
+      .button.secondary { border-color: var(--line); color: var(--ink); background: white; box-shadow: none; }
+      .button.secondary:hover { border-color: #b7c8e0; color: var(--blue-dark); background: #fbfdff; }
+      .button svg { width: 18px; height: 18px; }
+      .button.small { min-height: 38px; padding: 0 14px; border-radius: 10px; font-size: 0.84rem; }
+
+      .hero { overflow: hidden; padding: 94px 0 82px; background: radial-gradient(circle at 78% 28%, #e6f0ff 0, rgba(230, 240, 255, 0) 31%), var(--canvas); }
+      .hero-grid { display: grid; grid-template-columns: minmax(0, 1.03fr) minmax(390px, 0.97fr); align-items: center; gap: clamp(45px, 7vw, 100px); }
+      .hero-copy { position: relative; }
+      .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 24px; }
+      .benefits { display: flex; flex-wrap: wrap; gap: 10px 17px; margin: 0; padding: 0; color: #52617a; font-size: 0.86rem; font-weight: 700; list-style: none; }
+      .benefits li { display: flex; align-items: center; gap: 6px; }
+      .benefits svg { width: 16px; height: 16px; color: var(--green); }
+
+      .app-shell { position: relative; max-width: 472px; margin-left: auto; padding: 11px; border: 1px solid rgba(200, 215, 235, 0.95); border-radius: 27px; background: rgba(255, 255, 255, 0.8); box-shadow: var(--shadow); transform: rotate(1.5deg); }
+      .app-window { overflow: hidden; border: 1px solid #e0e7f2; border-radius: 18px; background: #fff; transform: rotate(-1.5deg); }
+      .app-topbar { display: flex; height: 45px; align-items: center; gap: 7px; padding: 0 17px; border-bottom: 1px solid #e9eef6; color: #50607a; background: #fbfcfe; font-size: 0.77rem; font-weight: 800; }
+      .app-dots { display: flex; gap: 5px; margin-right: 5px; }
+      .app-dots i { width: 7px; height: 7px; border-radius: 50%; background: #c4cede; }
+      .app-body { padding: 33px 34px 32px; }
+      .app-body > p { margin-bottom: 24px; color: #63718a; font-size: 0.88rem; }
+      .app-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: #15213a; font-size: 1.5rem; font-weight: 850; letter-spacing: -0.04em; }
+      .app-title .wifi { display: grid; width: 37px; height: 37px; place-items: center; border-radius: 11px; color: var(--blue); background: var(--blue-soft); }
+      .app-title svg { width: 21px; height: 21px; }
+      .status-card { padding: 18px; border: 1px solid #ccebdc; border-radius: 13px; background: var(--green-soft); }
+      .status-line { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; color: #17633f; font-weight: 850; }
+      .status-dot { width: 11px; height: 11px; flex: 0 0 auto; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px rgba(23, 147, 93, 0.12); animation: breathe 2.3s ease-in-out infinite; }
+      .status-card p { margin: 0; color: #477a60; font-size: 0.86rem; }
+      .app-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; color: #69809a; font-size: 0.78rem; font-weight: 700; }
+      .app-footer span { display: inline-flex; align-items: center; gap: 6px; }
+      .app-footer svg { width: 15px; height: 15px; }
+
+      .section { padding: 105px 0; }
+      .section-heading { max-width: 650px; margin-bottom: 46px; }
+      .section-heading p:last-child { max-width: 570px; margin-bottom: 0; color: var(--muted); font-size: 1.05rem; }
+      .section.alt { background: #fff; }
+
+      .flow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 19px; position: relative; }
+      .flow-card { position: relative; min-height: 245px; padding: 27px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
+      .flow-number { display: grid; width: 40px; height: 40px; place-items: center; margin-bottom: 37px; border-radius: 50%; color: var(--blue); background: var(--blue-soft); font-size: 0.85rem; font-weight: 900; }
+      .flow-card p { margin-bottom: 0; color: var(--muted); font-size: 0.95rem; }
+      .flow-arrow { position: absolute; top: 45px; right: -13px; z-index: 2; display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--blue); background: white; }
+      .flow-arrow svg { width: 15px; height: 15px; }
+
+      .setup-layout { display: grid; grid-template-columns: 0.86fr 1.14fr; align-items: start; gap: 75px; }
+      .setup-intro { position: sticky; top: 112px; }
+      .setup-intro p:last-child { max-width: 430px; color: var(--muted); font-size: 1.04rem; }
+      .timeline { display: grid; gap: 16px; }
+      .timeline-item { display: grid; grid-template-columns: 42px 1fr; gap: 18px; padding: 23px; border: 1px solid var(--line); border-radius: 17px; background: var(--canvas); }
+      .timeline-no { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: white; background: var(--blue); font-size: 0.8rem; font-weight: 900; }
+      .timeline-item h3 { margin: 3px 0 5px; }
+      .timeline-item p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+      .outcome { display: flex; gap: 15px; margin-top: 24px; padding: 22px; border-radius: 17px; color: #14583a; background: var(--green-soft); }
+      .outcome svg { width: 25px; height: 25px; flex: 0 0 auto; }
+      .outcome strong { display: block; margin-bottom: 2px; }
+      .outcome span { color: #477a60; font-size: 0.91rem; }
+      .small-note { margin: 17px 0 0; color: #6a7890; font-size: 0.85rem; }
+
+      .video-card { overflow: hidden; display: grid; grid-template-columns: 1.12fr 0.88fr; min-height: 348px; border-radius: 24px; color: white; background: #111e38; box-shadow: var(--shadow); }
+      .video-visual { position: relative; display: grid; min-height: 270px; place-items: center; overflow: hidden; background: radial-gradient(circle at 70% 18%, #2f83ff 0, rgba(47, 131, 255, 0) 31%), linear-gradient(135deg, #0e306b, #102040 73%); }
+      .video-visual::before, .video-visual::after { position: absolute; border: 1px solid rgba(255, 255, 255, 0.11); border-radius: 30px; content: ""; }
+      .video-visual::before { width: 260px; height: 130px; transform: rotate(-22deg); }
+      .video-visual::after { width: 330px; height: 185px; transform: rotate(23deg); }
+      .play-button { z-index: 1; display: grid; width: 72px; height: 72px; place-items: center; border: 0; border-radius: 50%; color: var(--blue-dark); background: white; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28); }
+      .play-button svg { width: 27px; height: 27px; margin-left: 3px; }
+      .video-copy { display: flex; flex-direction: column; justify-content: center; padding: clamp(30px, 5vw, 58px); }
+      .video-copy .eyebrow { color: #9cc4ff; }
+      .video-copy h2 { margin-bottom: 14px; color: white; font-size: clamp(1.8rem, 3.4vw, 2.7rem); }
+      .video-copy p { margin-bottom: 0; color: #c2d1e9; }
+      .video-copy .video-state { display: inline-flex; width: fit-content; margin-top: 24px; padding: 6px 10px; border: 1px solid rgba(157, 196, 255, 0.3); border-radius: 99px; color: #b8d6ff; font-size: 0.78rem; font-weight: 750; }
+      #tutorial-frame { width: 100%; min-height: 348px; border: 0; }
+
+      .security-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 19px; }
+      .security-card { padding: 29px; border: 1px solid var(--line); border-radius: 20px; background: white; }
+      .security-icon { display: grid; width: 43px; height: 43px; place-items: center; margin-bottom: 26px; border-radius: 12px; color: var(--blue); background: var(--blue-soft); }
+      .security-icon svg { width: 22px; height: 22px; }
+      .security-card p { margin-bottom: 0; color: var(--muted); font-size: 0.93rem; }
+      .callout { display: flex; gap: 16px; margin-top: 25px; padding: 23px 25px; border-left: 4px solid var(--blue); border-radius: 0 15px 15px 0; background: var(--blue-soft); }
+      .callout svg { width: 23px; height: 23px; flex: 0 0 auto; color: var(--blue); }
+      .callout p { margin: 0; color: #425f8c; }
+
+      .notice { display: grid; grid-template-columns: auto 1fr; gap: 19px; max-width: 860px; padding: 27px; border: 1px solid #f0d8a8; border-radius: 20px; background: #fffaf0; }
+      .notice-icon { display: grid; width: 43px; height: 43px; place-items: center; border-radius: 12px; color: var(--amber); background: #fff0d5; }
+      .notice-icon svg { width: 22px; height: 22px; }
+      .notice h3 { margin: 1px 0 6px; }
+      .notice p { margin: 0; color: #726044; }
+      .notice a { color: #8a5306; font-weight: 800; }
+
+      .faq { display: grid; grid-template-columns: minmax(250px, 0.7fr) minmax(0, 1.3fr); align-items: start; gap: 90px; }
+      .faq-intro { position: sticky; top: 112px; }
+      .faq-intro p:last-child { margin-bottom: 0; color: var(--muted); }
+      .faq-list { border-top: 1px solid var(--line); }
+      details { border-bottom: 1px solid var(--line); }
+      summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 21px 0; cursor: pointer; color: #1b2a45; font-weight: 800; list-style: none; }
+      summary::-webkit-details-marker { display: none; }
+      summary::after { flex: 0 0 auto; width: 10px; height: 10px; border-right: 2px solid var(--blue); border-bottom: 2px solid var(--blue); content: ""; transform: rotate(45deg) translateY(-3px); transition: transform 150ms ease; }
+      details[open] summary::after { transform: rotate(225deg) translate(-1px, -2px); }
+      details p { max-width: 650px; margin: -2px 32px 20px 0; color: var(--muted); font-size: 0.94rem; }
+
+      .cta { padding: 88px 0; color: white; background: #0e2348; }
+      .cta-inner { display: flex; align-items: center; justify-content: space-between; gap: 38px; }
+      .cta h2 { max-width: 620px; margin-bottom: 0; color: white; }
+      .cta-actions { flex: 0 0 auto; text-align: center; }
+      .cta .button { color: #083b91; background: white; box-shadow: none; }
+      .cta .button:hover { background: #e8f1ff; }
+      .cta-actions p { margin: 11px 0 0; color: #b6c8e4; font-size: 0.82rem; font-weight: 650; }
+
+      footer { padding: 32px 0; color: #60708b; background: #09182f; font-size: 0.85rem; }
+      .footer-inner { display: flex; align-items: center; justify-content: space-between; gap: 22px; }
+      .footer-links { display: flex; flex-wrap: wrap; gap: 18px; }
+      .footer-links a { color: #d1def0; font-weight: 700; text-decoration: none; }
+      .footer-links a:hover { color: white; }
+
+      @keyframes breathe { 50% { box-shadow: 0 0 0 8px rgba(23, 147, 93, 0.04); } }
+
+      @media (max-width: 860px) {
+        .hero { padding-top: 68px; }
+        .hero-grid, .setup-layout, .faq, .video-card { grid-template-columns: 1fr; }
+        .app-shell { width: min(100%, 480px); margin: 4px auto 0; }
+        .setup-intro, .faq-intro { position: static; }
+        .setup-layout, .faq { gap: 44px; }
+        .video-visual { min-height: 230px; }
+        #tutorial-frame { min-height: 300px; }
+        .cta-inner { align-items: flex-start; flex-direction: column; }
+        .cta-actions { text-align: left; }
+      }
+
+      @media (max-width: 680px) {
+        .wrap { width: min(calc(100% - 32px), var(--max)); }
+        .nav { min-height: 65px; }
+        .nav-links > a:not(.button) { display: none; }
+        .nav-links { gap: 0; }
+        .nav-links .button { min-height: 37px; padding: 0 12px; font-size: 0.79rem; }
+        .hero { padding-bottom: 64px; }
+        h1 { font-size: clamp(2.45rem, 13vw, 3.55rem); }
+        .hero h1 { overflow-wrap: anywhere; }
+        .hero-actions .button { width: 100%; }
+        .benefits { display: grid; grid-template-columns: 1fr; gap: 7px; }
+        .app-body { padding: 26px 22px 24px; }
+        .flow-grid, .security-grid { grid-template-columns: 1fr; }
+        .flow-card { min-height: 0; padding: 24px; }
+        .flow-number { margin-bottom: 26px; }
+        .flow-arrow { top: auto; right: auto; bottom: -13px; left: calc(50% - 13px); transform: rotate(90deg); }
+        .section { padding: 75px 0; }
+        .section-heading { margin-bottom: 34px; }
+        .timeline-item { padding: 20px; }
+        .notice { grid-template-columns: 1fr; gap: 12px; }
+        .footer-inner { align-items: flex-start; flex-direction: column; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav wrap" aria-label="Main navigation">
+        <a class="brand" href="#top" aria-label="Automate VIT WiFi home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
+          </span>
+          <span>Automate VIT WiFi</span>
+        </a>
+        <div class="nav-links">
+          <a href="#how-it-works">How it works</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/ryuk7728/automate-vit-wifi" target="_blank" rel="noreferrer">GitHub</a>
+          <!-- Primary download URL -->
+          <a class="button small" href="https://github.com/ryuk7728/automate-vit-wifi/releases/latest/download/Automate-VIT-WiFi-Setup.exe" data-action="download-installer">
+            Download
+          </a>
+        </div>
+      </nav>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-copy reveal">
+            <p class="eyebrow">Windows utility for VIT campus Wi-Fi</p>
+            <h1>Connect to VIT Wi‑Fi. Let login take care of itself.</h1>
+            <p class="lede">Automate VIT WiFi checks your internet connection after Windows joins a VIT network, then completes the captive-portal login only when it is needed.</p>
+            <div class="hero-actions">
+              <a class="button" href="https://github.com/ryuk7728/automate-vit-wifi/releases/latest/download/Automate-VIT-WiFi-Setup.exe" data-action="download-installer">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                Download for Windows
+              </a>
+              <a class="button secondary" href="https://github.com/ryuk7728/automate-vit-wifi" target="_blank" rel="noreferrer">View on GitHub</a>
+            </div>
+            <ul class="benefits" aria-label="Product benefits">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Free &amp; open source</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Password stays in Windows</li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Windows 10 / 11</li>
+            </ul>
+          </div>
+
+          <div class="app-shell reveal delay" aria-label="Example of the app's connected status">
+            <div class="app-window">
+              <div class="app-topbar"><span class="app-dots" aria-hidden="true"><i></i><i></i><i></i></span>Automate VIT WiFi</div>
+              <div class="app-body">
+                <div class="app-title"><span class="wifi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg></span>VIT Wi‑Fi</div>
+                <p>Automatic campus Wi-Fi login</p>
+                <div class="status-card">
+                  <div class="status-line"><span class="status-dot" aria-hidden="true"></span>Internet is working</div>
+                  <p>L-VIT is connected. You can safely close this window.</p>
+                </div>
+                <div class="app-footer"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Background automation enabled</span><span>Ready</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="how-it-works">
+        <div class="wrap">
+          <div class="section-heading">
+            <p class="eyebrow">How it works</p>
+            <h2>It handles the one step Wi‑Fi keeps asking you to repeat.</h2>
+            <p>No forced re-logins, no extra browser tab when the connection is already working.</p>
+          </div>
+          <div class="flow-grid">
+            <article class="flow-card">
+              <div class="flow-number">01</div>
+              <h3>Windows connects first</h3>
+              <p>Connect or auto-connect to your VIT Wi‑Fi network exactly as you normally would.</p>
+              <span class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+            </article>
+            <article class="flow-card">
+              <div class="flow-number">02</div>
+              <h3>The app checks the connection</h3>
+              <p>It verifies whether the internet already works before trying to do anything else.</p>
+              <span class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
+            </article>
+            <article class="flow-card">
+              <div class="flow-number">03</div>
+              <h3>It signs in only when needed</h3>
+              <p>If the captive portal needs you, it securely uses your saved credentials and verifies internet access.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="setup">
+        <div class="wrap setup-layout">
+          <div class="setup-intro">
+            <p class="eyebrow">Set up once</p>
+            <h2>Three small steps. Then forget about it.</h2>
+            <p>The app stays out of your way until Windows has joined a VIT Wi‑Fi network and needs captive-portal login.</p>
+          </div>
+          <div>
+            <div class="timeline">
+              <article class="timeline-item"><div class="timeline-no">1</div><div><h3>Download and install</h3><p>Download the Windows installer from this official GitHub release and run the setup.</p></div></article>
+              <article class="timeline-item"><div class="timeline-no">2</div><div><h3>Save campus credentials</h3><p>Open <strong>Automate VIT WiFi</strong> from Start, enter your campus username and password, then select <strong>Save credentials</strong>.</p></div></article>
+              <article class="timeline-item"><div class="timeline-no">3</div><div><h3>Leave automation enabled</h3><p>It starts quietly when you sign in to Windows and watches for a Wi‑Fi name containing uppercase <strong>VIT</strong>.</p></div></article>
+            </div>
+            <div class="outcome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><strong>Next time Windows joins a VIT Wi‑Fi network, login happens automatically.</strong><span>Typical captive-portal login takes a few seconds after Windows connects to Wi‑Fi.</span></div></div>
+            <p class="small-note">The app does not connect your laptop to Wi‑Fi. Windows handles that part.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="tutorial">
+        <div class="wrap">
+          <div class="section-heading">
+            <p class="eyebrow">Quick walkthrough</p>
+            <h2>See the whole setup before you install.</h2>
+          </div>
+          <div class="video-card" id="video-card">
+            <div class="video-visual" aria-hidden="true"><span class="play-button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7z"/></svg></span></div>
+            <div class="video-copy">
+              <p class="eyebrow">Video tutorial</p>
+              <h2>Two-minute setup walkthrough</h2>
+              <p>Installation, saving credentials, and what happens the next time you connect to campus Wi‑Fi.</p>
+              <span class="video-state">Tutorial coming soon</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="security">
+        <div class="wrap">
+          <div class="section-heading">
+            <p class="eyebrow">Built to stay simple</p>
+            <h2>Your Wi‑Fi login should not require another account.</h2>
+          </div>
+          <div class="security-grid">
+            <article class="security-card"><div class="security-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><h3>Your password stays on your PC</h3><p>It is stored for your Windows account in Windows Credential Manager, not in a website or cloud database.</p></article>
+            <article class="security-card"><div class="security-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M8 6h8"/><path d="M6 10h12"/><path d="M4 14h16"/><path d="M7 18h10"/></svg></div><h3>No cloud account</h3><p>There is no sign-up, dashboard, or separate online account to manage.</p></article>
+            <article class="security-card"><div class="security-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 5v-3.9a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 3.77 5.07 5.07 0 0 0 19.91.14S18.73-.21 16 1.64a13.38 13.38 0 0 0-7 0C6.27-.21 5.09.14 5.09.14A5.07 5.07 0 0 0 5 3.77 5.44 5.44 0 0 0 3.5 7.5c0 5.45 3.3 6.64 6.44 7A3.37 3.37 0 0 0 9 17.1V21"/></svg></div><h3>Open source</h3><p>Anyone can inspect the project, review its behavior, or contribute improvements on GitHub.</p></article>
+          </div>
+          <div class="callout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg><p><strong>Good to know:</strong> This is an unofficial student-made tool, not affiliated with VIT or the campus Wi‑Fi provider. It only automates the same captive-portal login you would normally complete manually.</p></div>
+        </div>
+      </section>
+
+      <section class="section alt" aria-labelledby="warning-heading">
+        <div class="wrap">
+          <div class="notice">
+            <div class="notice-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="m10.3 3.9-8.1 14A2 2 0 0 0 3.9 21h16.2a2 2 0 0 0 1.7-3.1l-8.1-14a2 2 0 0 0-3.4 0Z"/></svg></div>
+            <div><h3 id="warning-heading">Seeing a Windows warning on first install?</h3><p>Windows may identify a new unsigned app as an unknown publisher. Only continue if you downloaded the installer from this project’s <a href="https://github.com/ryuk7728/automate-vit-wifi/releases" target="_blank" rel="noreferrer">official GitHub Releases page</a>.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="faq">
+        <div class="wrap faq">
+          <div class="faq-intro"><p class="eyebrow">Questions, answered</p><h2>The practical details.</h2><p>Everything you need to know before installing.</p></div>
+          <div class="faq-list">
+            <details><summary>Does it connect my laptop to Wi‑Fi?</summary><p>No. Windows connects to Wi‑Fi; the app handles captive-portal login afterward.</p></details>
+            <details><summary>Will it work after I restart my laptop?</summary><p>Yes. If automation is enabled and Windows reconnects to the VIT Wi‑Fi network, the helper starts after you sign in to Windows.</p></details>
+            <details><summary>What if internet is already working?</summary><p>The app checks first, shows a green status, and does not submit your credentials to the portal.</p></details>
+            <details><summary>Can I turn it off?</summary><p>Yes. Open the app and choose <strong>Disable automation</strong>. That stops its background checks and automatic logins until you enable it again.</p></details>
+            <details><summary>Which Wi‑Fi networks does it handle?</summary><p>Networks whose names contain the exact uppercase text <strong>VIT</strong>.</p></details>
+            <details><summary>Does it send my password to a server?</summary><p>No. It uses your saved credentials only to log in to the captive portal from your own device.</p></details>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div class="wrap cta-inner">
+          <h2>Spend less time signing in. Get online.</h2>
+          <div class="cta-actions">
+            <a class="button" href="https://github.com/ryuk7728/automate-vit-wifi/releases/latest/download/Automate-VIT-WiFi-Setup.exe" data-action="download-installer">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+              Download for Windows
+            </a>
+            <p>Free, open source, Windows 10 / 11.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap footer-inner">
+        <span>Made by a VIT student for fellow students. Unofficial project; not affiliated with VIT.</span>
+        <div class="footer-links"><a href="https://github.com/ryuk7728/automate-vit-wifi" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/ryuk7728/automate-vit-wifi/releases" target="_blank" rel="noreferrer">Releases</a></div>
+      </div>
+    </footer>
+
+    <script>
+      // Video configuration: paste a trusted YouTube embed URL here when the tutorial is ready.
+      const VIDEO_URL = "";
+
+      if (VIDEO_URL) {
+        const card = document.getElementById("video-card");
+        const frame = document.createElement("iframe");
+        frame.id = "tutorial-frame";
+        frame.src = VIDEO_URL;
+        frame.title = "Automate VIT WiFi setup tutorial";
+        frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
+        frame.allowFullscreen = true;
+        card.replaceChildren(frame);
+      }
+    </script>
+  </body>
+</html>
