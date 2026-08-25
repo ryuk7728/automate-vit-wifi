@@ -8,7 +8,7 @@
       content="A small Windows utility that automatically completes the VIT captive-portal login after Windows connects to VIT Wi-Fi."
     />
     <meta name="theme-color" content="#0b5bd3" />
-    <title>Automate VIT WiFi — captive portal login, handled</title>
+    <title>Auto Connect | VIT Wi-Fi captive portal login</title>
     <style>
       :root {
         --ink: #101b33;
@@ -77,7 +77,7 @@
 
       h1, h2, h3 { letter-spacing: -0.04em; line-height: 1.08; }
 
-      h1 { max-width: 680px; margin-bottom: 20px; font-size: clamp(2.65rem, 6vw, 5.2rem); }
+      h1 { max-width: 900px; margin-bottom: 18px; font-size: clamp(2.35rem, 4.2vw, 3.75rem); }
       h2 { margin-bottom: 16px; font-size: clamp(2rem, 4vw, 3.35rem); }
       h3 { margin-bottom: 10px; font-size: 1.14rem; }
 
@@ -101,8 +101,8 @@
       }
 
       .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 800; text-decoration: none; letter-spacing: -0.02em; }
-      .brand-mark { display: grid; width: 31px; height: 31px; place-items: center; border-radius: 9px; color: white; background: var(--blue); box-shadow: 0 6px 14px rgba(11, 91, 211, 0.25); }
-      .brand-mark svg { width: 19px; height: 19px; }
+      .brand-mark { display: grid; width: 25px; height: 25px; place-items: center; color: var(--blue); }
+      .brand-mark svg { width: 25px; height: 25px; }
 
       .nav-links { display: flex; align-items: center; gap: 23px; font-size: 0.9rem; font-weight: 700; }
       .nav-links > a:not(.button) { color: #43516b; text-decoration: none; }
@@ -132,43 +132,17 @@
       .button svg { width: 18px; height: 18px; }
       .button.small { min-height: 38px; padding: 0 14px; border-radius: 10px; font-size: 0.84rem; }
 
-      .hero { overflow: hidden; padding: 94px 0 82px; background: radial-gradient(circle at 78% 28%, #e6f0ff 0, rgba(230, 240, 255, 0) 31%), var(--canvas); }
-      .hero-grid { display: grid; grid-template-columns: minmax(0, 1.03fr) minmax(390px, 0.97fr); align-items: center; gap: clamp(45px, 7vw, 100px); }
-      .hero-copy { position: relative; }
-      .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 24px; }
-      .benefits { display: flex; flex-wrap: wrap; gap: 10px 17px; margin: 0; padding: 0; color: #52617a; font-size: 0.86rem; font-weight: 700; list-style: none; }
+      .hero { overflow: hidden; padding: 92px 0 80px; background: radial-gradient(circle at 72% 8%, #e6f0ff 0, rgba(230, 240, 255, 0) 31%), var(--canvas); }
+      .hero-copy { max-width: 900px; position: relative; margin: 0 auto; text-align: center; }
+      .hero-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin: 30px 0 24px; }
+      .benefits { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 17px; margin: 0; padding: 0; color: #52617a; font-size: 0.86rem; font-weight: 700; list-style: none; }
       .benefits li { display: flex; align-items: center; gap: 6px; }
       .benefits svg { width: 16px; height: 16px; color: var(--green); }
-
-      .app-shell { position: relative; max-width: 472px; margin-left: auto; padding: 11px; border: 1px solid rgba(200, 215, 235, 0.95); border-radius: 27px; background: rgba(255, 255, 255, 0.8); box-shadow: var(--shadow); transform: rotate(1.5deg); }
-      .app-window { overflow: hidden; border: 1px solid #e0e7f2; border-radius: 18px; background: #fff; transform: rotate(-1.5deg); }
-      .app-topbar { display: flex; height: 45px; align-items: center; gap: 7px; padding: 0 17px; border-bottom: 1px solid #e9eef6; color: #50607a; background: #fbfcfe; font-size: 0.77rem; font-weight: 800; }
-      .app-dots { display: flex; gap: 5px; margin-right: 5px; }
-      .app-dots i { width: 7px; height: 7px; border-radius: 50%; background: #c4cede; }
-      .app-body { padding: 33px 34px 32px; }
-      .app-body > p { margin-bottom: 24px; color: #63718a; font-size: 0.88rem; }
-      .app-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: #15213a; font-size: 1.5rem; font-weight: 850; letter-spacing: -0.04em; }
-      .app-title .wifi { display: grid; width: 37px; height: 37px; place-items: center; border-radius: 11px; color: var(--blue); background: var(--blue-soft); }
-      .app-title svg { width: 21px; height: 21px; }
-      .status-card { padding: 18px; border: 1px solid #ccebdc; border-radius: 13px; background: var(--green-soft); }
-      .status-line { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; color: #17633f; font-weight: 850; }
-      .status-dot { width: 11px; height: 11px; flex: 0 0 auto; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px rgba(23, 147, 93, 0.12); animation: breathe 2.3s ease-in-out infinite; }
-      .status-card p { margin: 0; color: #477a60; font-size: 0.86rem; }
-      .app-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; color: #69809a; font-size: 0.78rem; font-weight: 700; }
-      .app-footer span { display: inline-flex; align-items: center; gap: 6px; }
-      .app-footer svg { width: 15px; height: 15px; }
 
       .section { padding: 105px 0; }
       .section-heading { max-width: 650px; margin-bottom: 46px; }
       .section-heading p:last-child { max-width: 570px; margin-bottom: 0; color: var(--muted); font-size: 1.05rem; }
       .section.alt { background: #fff; }
-
-      .flow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 19px; position: relative; }
-      .flow-card { position: relative; min-height: 245px; padding: 27px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper); }
-      .flow-number { display: grid; width: 40px; height: 40px; place-items: center; margin-bottom: 37px; border-radius: 50%; color: var(--blue); background: var(--blue-soft); font-size: 0.85rem; font-weight: 900; }
-      .flow-card p { margin-bottom: 0; color: var(--muted); font-size: 0.95rem; }
-      .flow-arrow { position: absolute; top: 45px; right: -13px; z-index: 2; display: grid; width: 26px; height: 26px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--blue); background: white; }
-      .flow-arrow svg { width: 15px; height: 15px; }
 
       .setup-layout { display: grid; grid-template-columns: 0.86fr 1.14fr; align-items: start; gap: 75px; }
       .setup-intro { position: sticky; top: 112px; }
@@ -183,6 +157,9 @@
       .outcome strong { display: block; margin-bottom: 2px; }
       .outcome span { color: #477a60; font-size: 0.91rem; }
       .small-note { margin: 17px 0 0; color: #6a7890; font-size: 0.85rem; }
+      .pro-tip { display: flex; gap: 12px; margin-top: 17px; padding: 17px 18px; border: 1px solid #cfe0fb; border-radius: 14px; color: #395b8f; background: var(--blue-soft); font-size: 0.9rem; }
+      .pro-tip svg { width: 21px; height: 21px; flex: 0 0 auto; color: var(--blue); }
+      .pro-tip p { margin: 0; }
 
       .video-card { overflow: hidden; display: grid; grid-template-columns: 1.12fr 0.88fr; min-height: 348px; border-radius: 24px; color: white; background: #111e38; box-shadow: var(--shadow); }
       .video-visual { position: relative; display: grid; min-height: 270px; place-items: center; overflow: hidden; background: radial-gradient(circle at 70% 18%, #2f83ff 0, rgba(47, 131, 255, 0) 31%), linear-gradient(135deg, #0e306b, #102040 73%); }
@@ -239,12 +216,9 @@
       .footer-links a { color: #d1def0; font-weight: 700; text-decoration: none; }
       .footer-links a:hover { color: white; }
 
-      @keyframes breathe { 50% { box-shadow: 0 0 0 8px rgba(23, 147, 93, 0.04); } }
-
       @media (max-width: 860px) {
         .hero { padding-top: 68px; }
-        .hero-grid, .setup-layout, .faq, .video-card { grid-template-columns: 1fr; }
-        .app-shell { width: min(100%, 480px); margin: 4px auto 0; }
+        .setup-layout, .faq, .video-card { grid-template-columns: 1fr; }
         .setup-intro, .faq-intro { position: static; }
         .setup-layout, .faq { gap: 44px; }
         .video-visual { min-height: 230px; }
@@ -260,15 +234,11 @@
         .nav-links { gap: 0; }
         .nav-links .button { min-height: 37px; padding: 0 12px; font-size: 0.79rem; }
         .hero { padding-bottom: 64px; }
-        h1 { font-size: clamp(2.45rem, 13vw, 3.55rem); }
+        h1 { font-size: clamp(2.25rem, 11vw, 2.8rem); }
         .hero h1 { overflow-wrap: anywhere; }
         .hero-actions .button { width: 100%; }
         .benefits { display: grid; grid-template-columns: 1fr; gap: 7px; }
-        .app-body { padding: 26px 22px 24px; }
-        .flow-grid, .security-grid { grid-template-columns: 1fr; }
-        .flow-card { min-height: 0; padding: 24px; }
-        .flow-number { margin-bottom: 26px; }
-        .flow-arrow { top: auto; right: auto; bottom: -13px; left: calc(50% - 13px); transform: rotate(90deg); }
+        .security-grid { grid-template-columns: 1fr; }
         .section { padding: 75px 0; }
         .section-heading { margin-bottom: 34px; }
         .timeline-item { padding: 20px; }
@@ -286,29 +256,24 @@
       <nav class="nav wrap" aria-label="Main navigation">
         <a class="brand" href="#top" aria-label="Automate VIT WiFi home">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M3.5 9.5a12 12 0 0 1 17 0"/><path d="M6.8 13a7.3 7.3 0 0 1 10.4 0"/><path d="M10.1 16.4a2.7 2.7 0 0 1 3.8 0"/><circle cx="12" cy="19.1" r="1" fill="currentColor" stroke="none"/></svg>
           </span>
-          <span>Automate VIT WiFi</span>
+          <span>Auto Connect</span>
         </a>
         <div class="nav-links">
-          <a href="#how-it-works">How it works</a>
+          <a href="#setup">Set up</a>
           <a href="#faq">FAQ</a>
           <a href="https://github.com/ryuk7728/automate-vit-wifi" target="_blank" rel="noreferrer">GitHub</a>
-          <!-- Primary download URL -->
-          <a class="button small" href="https://github.com/ryuk7728/automate-vit-wifi/releases/latest/download/Automate-VIT-WiFi-Setup.exe" data-action="download-installer">
-            Download
-          </a>
         </div>
       </nav>
     </header>
 
     <main id="top">
       <section class="hero">
-        <div class="wrap hero-grid">
-          <div class="hero-copy reveal">
-            <p class="eyebrow">Windows utility for VIT campus Wi-Fi</p>
-            <h1>Connect to VIT Wi‑Fi. Let login take care of itself.</h1>
-            <p class="lede">Automate VIT WiFi checks your internet connection after Windows joins a VIT network, then completes the captive-portal login only when it is needed.</p>
+        <div class="wrap">
+          <div class="hero-copy">
+            <h1>Auto Connect to VIT Wi‑Fi.</h1>
+            <p class="lede">Auto Connect detects a VIT network after Windows connects, then signs in to the captive portal automatically, without opening the login page.</p>
             <div class="hero-actions">
               <a class="button" href="https://github.com/ryuk7728/automate-vit-wifi/releases/latest/download/Automate-VIT-WiFi-Setup.exe" data-action="download-installer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
@@ -322,54 +287,10 @@
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>Windows 10 / 11</li>
             </ul>
           </div>
-
-          <div class="app-shell reveal delay" aria-label="Example of the app's connected status">
-            <div class="app-window">
-              <div class="app-topbar"><span class="app-dots" aria-hidden="true"><i></i><i></i><i></i></span>Automate VIT WiFi</div>
-              <div class="app-body">
-                <div class="app-title"><span class="wifi" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14 0"/><path d="M8.5 16a6 6 0 0 1 7 0"/><path d="M12 20h.01"/></svg></span>VIT Wi‑Fi</div>
-                <p>Automatic campus Wi-Fi login</p>
-                <div class="status-card">
-                  <div class="status-line"><span class="status-dot" aria-hidden="true"></span>Internet is working</div>
-                  <p>L-VIT is connected. You can safely close this window.</p>
-                </div>
-                <div class="app-footer"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Background automation enabled</span><span>Ready</span></div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
-      <section class="section alt" id="how-it-works">
-        <div class="wrap">
-          <div class="section-heading">
-            <p class="eyebrow">How it works</p>
-            <h2>It handles the one step Wi‑Fi keeps asking you to repeat.</h2>
-            <p>No forced re-logins, no extra browser tab when the connection is already working.</p>
-          </div>
-          <div class="flow-grid">
-            <article class="flow-card">
-              <div class="flow-number">01</div>
-              <h3>Windows connects first</h3>
-              <p>Connect or auto-connect to your VIT Wi‑Fi network exactly as you normally would.</p>
-              <span class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
-            </article>
-            <article class="flow-card">
-              <div class="flow-number">02</div>
-              <h3>The app checks the connection</h3>
-              <p>It verifies whether the internet already works before trying to do anything else.</p>
-              <span class="flow-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></span>
-            </article>
-            <article class="flow-card">
-              <div class="flow-number">03</div>
-              <h3>It signs in only when needed</h3>
-              <p>If the captive portal needs you, it securely uses your saved credentials and verifies internet access.</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="section" id="setup">
+      <section class="section alt" id="setup">
         <div class="wrap setup-layout">
           <div class="setup-intro">
             <p class="eyebrow">Set up once</p>
@@ -384,6 +305,7 @@
             </div>
             <div class="outcome"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><div><strong>Next time Windows joins a VIT Wi‑Fi network, login happens automatically.</strong><span>Typical captive-portal login takes a few seconds after Windows connects to Wi‑Fi.</span></div></div>
             <p class="small-note">The app does not connect your laptop to Wi‑Fi. Windows handles that part.</p>
+            <div class="pro-tip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 2.5h4.6l.7 3.2 2.5 2.2-.8 3.2 1.7 2.9-2.1 2.6.1 3.3-3.1 1.1-2.4 2.2-2.9-1.6-3.2.7-1.2-3.1-2.3-2.3 1.5-2.9-.8-3.2 3-1.3L6.5 4Z"/><path d="m8.8 12.3 2.1 2.1 4.4-4.5"/></svg><p><strong>Pro tip:</strong> In the Windows Wi‑Fi list, open the VIT network you normally use and turn on <strong>Connect automatically</strong>. Windows will join it itself, then Auto Connect can sign you in.</p></div>
           </div>
         </div>
       </section>
@@ -434,7 +356,6 @@
         <div class="wrap faq">
           <div class="faq-intro"><p class="eyebrow">Questions, answered</p><h2>The practical details.</h2><p>Everything you need to know before installing.</p></div>
           <div class="faq-list">
-            <details><summary>Does it connect my laptop to Wi‑Fi?</summary><p>No. Windows connects to Wi‑Fi; the app handles captive-portal login afterward.</p></details>
             <details><summary>Will it work after I restart my laptop?</summary><p>Yes. If automation is enabled and Windows reconnects to the VIT Wi‑Fi network, the helper starts after you sign in to Windows.</p></details>
             <details><summary>What if internet is already working?</summary><p>The app checks first, shows a green status, and does not submit your credentials to the portal.</p></details>
             <details><summary>Can I turn it off?</summary><p>Yes. Open the app and choose <strong>Disable automation</strong>. That stops its background checks and automatic logins until you enable it again.</p></details>
@@ -460,7 +381,7 @@
 
     <footer>
       <div class="wrap footer-inner">
-        <span>Made by a VIT student for fellow students. Unofficial project; not affiliated with VIT.</span>
+        <span>Made by a VIT student for fellow students.</span>
         <div class="footer-links"><a href="https://github.com/ryuk7728/automate-vit-wifi" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/ryuk7728/automate-vit-wifi/releases" target="_blank" rel="noreferrer">Releases</a></div>
       </div>
     </footer>
